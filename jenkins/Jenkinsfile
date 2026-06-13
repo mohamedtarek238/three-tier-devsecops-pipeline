@@ -11,7 +11,7 @@ pipeline {
         stage('Clone Repository') {
             steps {
                 git branch: 'main',
-                    url: 'https://github.com/mohamedtarek238/back-end-power-store.git'
+                    url: 'https://github.com/mohamedtarek238/three-tier-devsecops-pipeline.git'
             }
         }
 
@@ -24,7 +24,9 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
-                sh 'npm install'
+                dir('backend') {
+                    sh 'npm install'
+                }
             }
         }
 
@@ -35,22 +37,25 @@ pipeline {
                 }
 
                 withSonarQubeEnv('sonarqube') {
-                    sh """
-                    ${scannerHome}/bin/sonar-scanner \
-                    -Dsonar.projectKey=power-store \
-                    -Dsonar.projectName=power-store \
-                    -Dsonar.sources=src
-                    """
+                    dir('backend') {
+                        sh """
+                        ${scannerHome}/bin/sonar-scanner \
+                        -Dsonar.projectKey=power-store \
+                        -Dsonar.projectName=power-store \
+                        -Dsonar.sources=src
+                        """
+                    }
                 }
             }
         }
 
         stage('Docker Build') {
             steps {
-                sh '''
+                sh """
                 docker build \
-                -t ${IMAGE_NAME}:${IMAGE_TAG} .
-                '''
+                -t ${IMAGE_NAME}:${IMAGE_TAG} \
+                backend
+                """
             }
         }
 
@@ -62,25 +67,24 @@ pipeline {
 
         stage('Trivy Scan') {
             steps {
-                sh '''
+                sh """
                 trivy image \
                 --severity HIGH,CRITICAL \
                 ${IMAGE_NAME}:${IMAGE_TAG}
-                '''
+                """
             }
         }
 
         stage('Trivy Security Gate') {
             steps {
-                sh '''
+                sh """
                 trivy image \
                 --exit-code 1 \
                 --severity CRITICAL \
                 ${IMAGE_NAME}:${IMAGE_TAG}
-                '''
+                """
             }
         }
-
     }
 
     post {
